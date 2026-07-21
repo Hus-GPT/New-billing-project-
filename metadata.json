@@ -1,0 +1,6 @@
+{
+  "name": "GABER",
+  "description": "نظام متكامل ومقسم إلى طبقات مستقلة لإدارة العقارات، الفواتير، قراءات العدادات، والأرشفة في بيئة البايثون و Google Colab.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

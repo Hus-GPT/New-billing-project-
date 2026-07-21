@@ -1,0 +1,537 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>لوحة التحكم لإدارة العقارات</title>
+    <!-- تضمين مكتبة Tailwind CSS و FontAwesome للأيقونات -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <!-- تخصيص خطوط وألوان مخصصة -->
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Cairo', sans-serif;
+            background-color: #f8fafc;
+        }
+    </style>
+</head>
+<body class="text-slate-800 transition-colors duration-200">
+    <!-- غلاف لوحة التحكم -->
+    <div class="min-h-screen flex flex-col">
+        <!-- شريط علوي أنيق -->
+        <header class="bg-slate-900 text-white shadow-md py-4 px-6 sticky top-0 z-50">
+            <div class="container mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
+                <div class="flex items-center gap-3">
+                    <div class="bg-indigo-600 p-2 rounded-lg text-white">
+                        <i class="fa-solid fa-hotel text-xl"></i>
+                    </div>
+                    <div>
+                        <h1 class="text-xl font-bold tracking-tight">نظام سند للإدارة العقارية</h1>
+                        <p class="text-xs text-slate-400">لوحة المراقبة وإصدار الفواتير الآلية</p>
+                    </div>
+                </div>
+                <!-- حالة التشغيل والتنبيهات -->
+                <div class="flex items-center gap-4 relative">
+                    <!-- زر التنبيهات مع شارة مرئية -->
+                    <div class="relative">
+                        <button onclick="toggleNotifications()" class="relative p-2 text-slate-300 hover:text-white transition focus:outline-none" title="التنبيهات العقارية">
+                            <i class="fa-solid fa-bell text-xl"></i>
+                            <!-- شارة التنبيهات الملونة (تظهر فقط عند وجود فواتير متأخرة) -->
+                            <span id="notification-badge" class="absolute -top-1 -right-1 bg-rose-500 text-white text-[10px] font-bold rounded-full h-5 w-5 flex items-center justify-center animate-bounce hidden">
+                                0
+                            </span>
+                        </button>
+
+                        <!-- قائمة التنبيهات المنسدلة (تفتح بالضغط) -->
+                        <div id="notification-dropdown" class="absolute left-0 mt-3 w-80 bg-white rounded-xl shadow-2xl border border-slate-100 py-2 hidden z-[100] text-slate-800">
+                            <div class="px-4 py-2 border-b border-slate-100 flex justify-between items-center">
+                                <span class="font-bold text-sm text-slate-900">تنبيهات الفواتير المتأخرة</span>
+                                <span id="overdue-count-pill" class="bg-rose-100 text-rose-700 text-xs px-2 py-0.5 rounded-full font-semibold">0 متأخرة</span>
+                            </div>
+                            <div id="notification-items" class="max-h-64 overflow-y-auto divide-y divide-slate-50 text-xs">
+                                <!-- يتم ملء التنبيهات ديناميكياً -->
+                            </div>
+                            <div class="px-4 py-2 border-t border-slate-100 text-center">
+                                <button onclick="filterBills('غير مدفوع'); toggleNotifications();" class="text-indigo-600 hover:text-indigo-800 font-semibold text-xs">عرض جميع الفواتير المعلقة</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <span class="bg-slate-800 text-emerald-400 px-3 py-1 rounded-full text-xs font-semibold flex items-center gap-2 border border-slate-700">
+                        <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                        بيئة تشغيل Colab نشطة
+                    </span>
+                    <button onclick="window.location.reload();" class="text-slate-300 hover:text-white transition" title="تحديث البيانات">
+                        <i class="fa-solid fa-arrows-rotate text-lg"></i>
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <!-- المحتوى الرئيسي للملف -->
+        <main class="flex-1 container mx-auto px-4 py-8 grid grid-cols-1 lg:grid-cols-4 gap-8">
+            <!-- عمود التقارير والفواتير (3 أرباع العرض في الشاشات الكبيرة) -->
+            <div class="lg:col-span-3 space-y-8">
+                
+                <!-- لوحة الإحصائيات السريعة (بينتو جريد) -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6">
+                    <!-- الإجمالي الكلي للفواتير -->
+                    <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-100 flex items-center justify-between">
+                        <div>
+                            <p class="text-sm text-slate-500 font-medium">إجمالي المبالغ المفوترة</p>
+                            <h3 id="stat-total" class="text-2xl font-bold text-slate-900 mt-1">0.00 ر.س</h3>
+                        </div>
+                        <div class="bg-indigo-50 p-3 rounded-lg text-indigo-600">
+                            <i class="fa-solid fa-file-invoice-dollar text-2xl"></i>
+                        </div>
+                    </div>
+
+                    <!-- المبالغ المحصلة -->
+                    <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-100 flex items-center justify-between">
+                        <div>
+                            <p class="text-sm text-slate-500 font-medium">المبالغ المحصلة</p>
+                            <h3 id="stat-collected" class="text-2xl font-bold text-emerald-600 mt-1">0.00 ر.س</h3>
+                        </div>
+                        <div class="bg-emerald-50 p-3 rounded-lg text-emerald-600">
+                            <i class="fa-solid fa-circle-check text-2xl"></i>
+                        </div>
+                    </div>
+
+                    <!-- المبالغ المعلقة -->
+                    <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-100 flex items-center justify-between">
+                        <div>
+                            <p class="text-sm text-slate-500 font-medium">المستحقات المعلقة</p>
+                            <h3 id="stat-pending" class="text-2xl font-bold text-amber-600 mt-1">0.00 ر.س</h3>
+                        </div>
+                        <div class="bg-amber-50 p-3 rounded-lg text-amber-600">
+                            <i class="fa-solid fa-clock text-2xl"></i>
+                        </div>
+                    </div>
+
+                    <!-- نسبة التحصيل المالي -->
+                    <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-100 flex items-center justify-between">
+                        <div>
+                            <p class="text-sm text-slate-500 font-medium">نسبة التحصيل المالي</p>
+                            <h3 id="stat-rate" class="text-2xl font-bold text-sky-600 mt-1">0%</h3>
+                        </div>
+                        <div class="bg-sky-50 p-3 rounded-lg text-sky-600">
+                            <i class="fa-solid fa-chart-line text-2xl"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- شريط التصفية والبحث في الفواتير -->
+                <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-100 flex flex-col md:flex-row justify-between items-center gap-4">
+                    <div class="flex flex-wrap items-center gap-2">
+                        <button onclick="filterBills('all')" id="btn-all" class="px-4 py-2 rounded-lg text-sm font-semibold bg-slate-900 text-white shadow-sm transition">الكل</button>
+                        <button onclick="filterBills('مدفوع')" id="btn-paid" class="px-4 py-2 rounded-lg text-sm font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200 transition">مدفوع</button>
+                        <button onclick="filterBills('غير مدفوع')" id="btn-unpaid" class="px-4 py-2 rounded-lg text-sm font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200 transition">غير مدفوع</button>
+                        <button onclick="filterBills('مدفوع جزئياً')" id="btn-partial" class="px-4 py-2 rounded-lg text-sm font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200 transition">مدفوع جزئياً</button>
+                    </div>
+                    <div class="relative w-full md:w-72">
+                        <input type="text" id="search-input" oninput="searchBills()" placeholder="ابحث باسم المستأجر أو نوع الفاتورة..." class="w-full pl-4 pr-10 py-2 rounded-lg border border-slate-200 text-sm focus:outline-none focus:border-indigo-500 transition">
+                        <i class="fa-solid fa-magnifying-glass absolute right-3 top-3 text-slate-400 text-sm"></i>
+                    </div>
+                </div>
+
+                <!-- جدول الفواتير -->
+                <div class="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
+                    <div class="px-6 py-4 border-b border-slate-100">
+                        <h3 class="font-bold text-slate-900">سجل الفواتير الصادرة</h3>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-right border-collapse">
+                            <thead>
+                                <tr class="bg-slate-50 text-slate-500 text-sm font-semibold">
+                                    <th class="p-4">رقم الفاتورة</th>
+                                    <th class="p-4">المستأجر</th>
+                                    <th class="p-4">الشقة</th>
+                                    <th class="p-4">نوع الفاتورة</th>
+                                    <th class="p-4 text-left">الاستهلاك</th>
+                                    <th class="p-4 text-left">المتأخرات</th>
+                                    <th class="p-4 text-left text-indigo-600">المصاريف المشتركة</th>
+                                    <th class="p-4 text-left font-bold text-slate-800">المجموع الكلي</th>
+                                    <th class="p-4 text-left text-emerald-600">المدفوع الفعلي</th>
+                                    <th class="p-4">تاريخ الاستحقاق</th>
+                                    <th class="p-4 text-center">الحالة</th>
+                                </tr>
+                            </thead>
+                            <tbody id="bills-table-body" class="divide-y divide-slate-100 text-sm">
+                                <!-- سيتم تعبئة البيانات ديناميكياً -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- العمود الجانبي (المساعد الذكي ومعلومات السند) -->
+            <div class="space-y-8">
+                <!-- بطاقة المساعد الجانبي الذكي -->
+                <div class="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden flex flex-col h-[500px]">
+                    <div class="bg-slate-900 p-4 text-white flex items-center gap-3">
+                        <div class="w-8 h-8 rounded-full bg-indigo-600 flex items-center justify-center text-white">
+                            <i class="fa-solid fa-robot"></i>
+                        </div>
+                        <div>
+                            <h4 class="font-bold text-sm">مساعد سند العقاري</h4>
+                            <p class="text-xs text-indigo-300">نشط الآن للمساعدة</p>
+                        </div>
+                    </div>
+                    
+                    <!-- صندوق المحادثة -->
+                    <div id="chat-box" class="flex-1 p-4 overflow-y-auto space-y-4 text-xs">
+                        <div class="bg-slate-50 p-3 rounded-lg border border-slate-100 text-slate-600">
+                            أهلاً بك! أنا مساعدك العقاري الذكي "سند". يمكنك سؤالي عن قائمة المستأجرين، أو كشف الفواتير، أو الاستفسار عن المبالغ المتأخرة!
+                        </div>
+                    </div>
+
+                    <!-- إدخال الأسئلة -->
+                    <div class="p-3 border-t border-slate-100 flex gap-2">
+                        <input type="text" id="chat-input" placeholder="اسأل مساعد سند هنا..." onkeypress="handleChatKey(event)" class="flex-1 px-3 py-2 border border-slate-200 rounded-lg text-xs focus:outline-none focus:border-indigo-500">
+                        <button onclick="sendChatMessage()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-2 rounded-lg transition">
+                            <i class="fa-solid fa-paper-plane"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- بطاقة معلومات الأرشيف والبيانات -->
+                <div class="bg-slate-900 text-slate-300 p-6 rounded-xl shadow-md border border-slate-800 space-y-4">
+                    <h4 class="font-bold text-white flex items-center gap-2">
+                        <i class="fa-solid fa-shield-halved text-indigo-400"></i>
+                        سلامة وتزامن البيانات
+                    </h4>
+                    <p class="text-xs leading-relaxed text-slate-400">
+                        يعتمد النظام على هيكلية قواعد البيانات المنفصلة (Decoupled Layered Architecture)، حيث يتم حفظ وتزامن كافة الجداول الأربعة بصيغة CSV في مجلد الأرشيف والنسخ الاحتياطي تلقائياً لضمان عدم فقدان أي معاملة مالية.
+                    </p>
+                    <div class="border-t border-slate-800 pt-3 space-y-2 text-xs">
+                        <div class="flex justify-between">
+                            <span class="text-slate-500">مجلد الأرشيف:</span>
+                            <span class="font-semibold text-slate-200">data_backup/</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-slate-500">حالة التزامن:</span>
+                            <span class="text-emerald-400 flex items-center gap-1">
+                                <i class="fa-solid fa-circle-check"></i>
+                                مستقر وتلقائي
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <footer class="bg-slate-100 border-t border-slate-200 py-6 text-center text-xs text-slate-500">
+            <div class="container mx-auto">
+                <p>© 2026 نظام سند لإدارة العقارات الذكية. تم بناؤه بهيكلية بايثون المتكاملة.</p>
+            </div>
+        </footer>
+    </div>
+
+    <!-- كود الجافا سكريبت لمعالجة وتصفية البيانات المعروضة -->
+    <script>
+        // سيتم حقن مصفوفة الفواتير هنا عبر دالة Python
+        const rawBills = {{BILLS_JSON}};
+
+        // تهيئة البيانات
+        let bills = Array.isArray(rawBills) ? rawBills : [];
+        let activeFilter = 'all';
+
+        // دالة لعرض الإحصائيات
+        function renderStats() {
+            let total = 0;
+            let collected = 0;
+            let pending = 0;
+
+            bills.forEach(bill => {
+                const amount = parseFloat(bill.total) || 0;
+                const paid = (bill.paid_amount !== undefined && bill.paid_amount !== null) ? parseFloat(bill.paid_amount) : 0;
+                total += amount;
+                
+                if (bill.status === 'مدفوع') {
+                    collected += Math.max(amount, paid);
+                } else {
+                    collected += paid;
+                }
+            });
+            pending = Math.max(0, total - collected);
+
+            const rate = total > 0 ? Math.round((collected / total) * 100) : 0;
+
+            document.getElementById('stat-total').innerText = total.toLocaleString('ar-SA', { minimumFractionDigits: 2 }) + ' ر.س';
+            document.getElementById('stat-collected').innerText = collected.toLocaleString('ar-SA', { minimumFractionDigits: 2 }) + ' ر.س';
+            document.getElementById('stat-pending').innerText = pending.toLocaleString('ar-SA', { minimumFractionDigits: 2 }) + ' ر.س';
+            document.getElementById('stat-rate').innerText = rate + '%';
+        }
+
+        // دالة لعرض الفواتير في الجدول
+        function renderTable(dataToRender = bills) {
+            const tableBody = document.getElementById('bills-table-body');
+            tableBody.innerHTML = '';
+
+            if (dataToRender.length === 0) {
+                tableBody.innerHTML = `
+                    <tr>
+                        <td colspan="11" class="p-8 text-center text-slate-400">
+                            <i class="fa-solid fa-box-open text-3xl mb-2 block"></i>
+                            لا توجد فواتير مطابقة لخيارات البحث الحالية.
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+
+            dataToRender.forEach(bill => {
+                let statusClass = '';
+                if (bill.status === 'مدفوع') {
+                    statusClass = 'bg-emerald-50 text-emerald-700 border-emerald-100';
+                } else if (bill.status === 'مدفوع جزئياً') {
+                    statusClass = 'bg-sky-50 text-sky-700 border-sky-100';
+                } else {
+                    statusClass = 'bg-rose-50 text-rose-700 border-rose-100';
+                }
+
+                const row = document.createElement('tr');
+                row.className = 'hover:bg-slate-50 transition duration-150';
+                row.innerHTML = `
+                    <td class="p-4 font-semibold text-slate-900">${bill.bill_id || '-'}</td>
+                    <td class="p-4">${bill.tenant_name || 'مستأجر مجهول'}</td>
+                    <td class="p-4 text-slate-500">${bill.apartment_number || '-'}</td>
+                    <td class="p-4">
+                        <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md text-xs font-medium bg-slate-100 text-slate-800">
+                            ${bill.bill_type === 'كهرباء' ? '<i class="fa-solid fa-bolt text-amber-500"></i>' : 
+                              bill.bill_type === 'مياه' ? '<i class="fa-solid fa-droplet text-blue-500"></i>' : 
+                              bill.bill_type === 'فاتورة شهرية شاملة' ? '<i class="fa-solid fa-folder-open text-teal-500"></i>' :
+                              '<i class="fa-solid fa-file-invoice text-indigo-500"></i>'}
+                            ${bill.bill_type}
+                        </span>
+                    </td>
+                    <td class="p-4 text-left font-mono">${(parseFloat(bill.amount) || 0).toFixed(2)} ر.س</td>
+                    <td class="p-4 text-left font-mono text-slate-400">${(parseFloat(bill.arrears) || 0).toFixed(2)} ر.س</td>
+                    <td class="p-4 text-left font-mono text-indigo-500 font-medium">${(parseFloat(bill.service_charges) || 0).toFixed(2)} ر.س</td>
+                    <td class="p-4 text-left font-bold text-slate-900 font-mono">${(parseFloat(bill.total) || 0).toFixed(2)} ر.س</td>
+                    <td class="p-4 text-left font-mono text-emerald-600 font-bold">${(parseFloat(bill.paid_amount) || 0).toFixed(2)} ر.س</td>
+                    <td class="p-4 text-slate-500">${bill.due_date || '-'}</td>
+                    <td class="p-4 text-center">
+                        <span class="inline-block px-3 py-1 rounded-full text-xs font-bold border ${statusClass}">
+                            ${bill.status}
+                        </span>
+                    </td>
+                `;
+                tableBody.appendChild(row);
+            });
+        }
+
+        // دالة تصفية الفواتير حسب الحالة
+        function filterBills(status) {
+            activeFilter = status;
+            
+            // تحديث تصميم الأزرار
+            const btns = {
+                'all': document.getElementById('btn-all'),
+                'مدفوع': document.getElementById('btn-paid'),
+                'غير مدفوع': document.getElementById('btn-unpaid'),
+                'مدفوع جزئياً': document.getElementById('btn-partial')
+            };
+
+            for (let k in btns) {
+                if (btns[k]) {
+                    if (k === status) {
+                        btns[k].className = 'px-4 py-2 rounded-lg text-sm font-semibold bg-slate-900 text-white shadow-sm transition';
+                    } else {
+                        btns[k].className = 'px-4 py-2 rounded-lg text-sm font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200 transition';
+                    }
+                }
+            }
+
+            applyFiltersAndSearch();
+        }
+
+        // البحث المتزامن
+        function searchBills() {
+            applyFiltersAndSearch();
+        }
+
+        // دمج التصفية والبحث
+        function applyFiltersAndSearch() {
+            const searchValue = document.getElementById('search-input').value.trim().toLowerCase();
+            let filtered = bills;
+
+            if (activeFilter !== 'all') {
+                filtered = filtered.filter(b => b.status === activeFilter);
+            }
+
+            if (searchValue) {
+                filtered = filtered.filter(b => {
+                    const name = (b.tenant_name || '').toLowerCase();
+                    const type = (b.bill_type || '').toLowerCase();
+                    const appt = (b.apartment_number || '').toLowerCase();
+                    return name.includes(searchValue) || type.includes(searchValue) || appt.includes(searchValue);
+                });
+            }
+
+            renderTable(filtered);
+        }
+
+        // المساعد الذكي - كود المحادثة
+        function handleChatKey(event) {
+            if (event.key === 'Enter') {
+                sendChatMessage();
+            }
+        }
+
+        function sendChatMessage() {
+            const input = document.getElementById('chat-input');
+            const messageText = input.value.trim();
+            if (!messageText) return;
+
+            appendMessage('user', messageText);
+            input.value = '';
+
+            // محاكاة إجابة ذكية من نظام "سند" بناء على الكلمات المفتاحية
+            setTimeout(() => {
+                let reply = "عذراً، لم أفهم سؤالك تماماً. يمكنك أن تسألني عن 'قائمة المستأجرين'، 'المتأخرات'، 'الفواتير غير المدفوعة' أو 'التقرير المالي' لكي أزودك بالبيانات الفورية.";
+                
+                const query = messageText.toLowerCase();
+                if (query.includes('مستأجر') || query.includes('الأسماء') || query.includes('اسماء')) {
+                    const names = [...new Set(bills.map(b => b.tenant_name))];
+                    reply = `لدينا حالياً المستأجرين النشطين المسجلين في النظام وهم: <br><strong class="text-indigo-600">${names.join(' ، ')}</strong>.`;
+                } else if (query.includes('متأخرات') || query.includes('ديون') || query.includes('المستحقات')) {
+                    let totalArrears = bills.reduce((acc, b) => {
+                        if (b.status === 'غير مدفوع' || b.status === 'مدفوع جزئياً') {
+                            const totalVal = parseFloat(b.total) || 0;
+                            const paidVal = (b.paid_amount !== undefined && b.paid_amount !== null) ? parseFloat(b.paid_amount) : 0;
+                            return acc + Math.max(0, totalVal - paidVal);
+                        }
+                        return acc;
+                    }, 0);
+                    reply = `إجمالي المبالغ والديون المتأخرة المستحقة على جميع المستأجرين حالياً تبلغ: <strong class="text-amber-600">${totalArrears.toFixed(2)} ر.س</strong>.`;
+                } else if (query.includes('غير مدفوع') || query.includes('معلق') || query.includes('الفواتير')) {
+                    const unpaid = bills.filter(b => b.status === 'غير مدفوع');
+                    reply = `يوجد حالياً عدد <strong class="text-rose-600">${unpaid.length} فواتير غير مدفوعة بالكامل</strong> بانتظار السداد من المستأجرين.`;
+                } else if (query.includes('تقرير') || query.includes('الإحصائيات') || query.includes('ملخص')) {
+                    let total = bills.reduce((acc, b) => acc + (parseFloat(b.total) || 0), 0);
+                    let collected = bills.reduce((acc, b) => {
+                        const amount = parseFloat(b.total) || 0;
+                        const paid = (b.paid_amount !== undefined && b.paid_amount !== null) ? parseFloat(b.paid_amount) : 0;
+                        if (b.status === 'مدفوع') return acc + Math.max(amount, paid);
+                        return acc + paid;
+                    }, 0);
+                    let pending = Math.max(0, total - collected);
+                    reply = `تقرير سند المالي السريع: <br>• إجمالي المفوتر: <strong>${total.toFixed(2)} ر.س</strong><br>• إجمالي المحصل الفعلي: <strong class="text-emerald-600">${collected.toFixed(2)} ر.س</strong><br>• المبالغ المعلقة: <strong class="text-rose-600">${pending.toFixed(2)} ر.س</strong><br>• الفواتير النشطة: <strong>${bills.length} فاتورة</strong>.`;
+                } else if (query.includes('شكرا') || query.includes('أهلاً') || query.includes('السلام')) {
+                    reply = "أهلاً بك! أنا في الخدمة دائماً لمساعدتك في إدارة أملاكك وعقاراتك بكل كفاءة.";
+                }
+
+                appendMessage('bot', reply);
+            }, 600);
+        }
+
+        function appendMessage(sender, text) {
+            const chatBox = document.getElementById('chat-box');
+            const msgDiv = document.createElement('div');
+            
+            if (sender === 'user') {
+                msgDiv.className = 'bg-indigo-50 border border-indigo-100 p-2.5 rounded-lg text-slate-800 mr-8 text-right font-medium';
+            } else {
+                msgDiv.className = 'bg-slate-50 border border-slate-100 p-2.5 rounded-lg text-slate-600 ml-8 text-right';
+            }
+
+            msgDiv.innerHTML = text;
+            chatBox.appendChild(msgDiv);
+            chatBox.scrollTop = chatBox.scrollHeight;
+        }
+
+        // دالة تحديث التنبيهات المتأخرة وتحديد الفواتير التي تجاوزت تاريخ الاستحقاق
+        function updateOverdueNotifications() {
+            const badge = document.getElementById('notification-badge');
+            const itemsContainer = document.getElementById('notification-items');
+            const countPill = document.getElementById('overdue-count-pill');
+
+            if (!badge || !itemsContainer || !countPill) return;
+
+            // الحصول على التاريخ الحالي في صيغة YYYY-MM-DD
+            // بما أن تاريخ اليوم الافتراضي للنظام هو 2026-07-20، سنستخدم هذا التاريخ للمقارنة
+            const todayStr = "2026-07-20";
+            
+            // تصفية الفواتير المتأخرة: الحالة غير مدفوع أو مدفوع جزئياً والتاريخ أقل من اليوم
+            const overdueBills = bills.filter(bill => {
+                const isUnpaid = bill.status === 'غير مدفوع' || bill.status === 'مدفوع جزئياً';
+                if (!isUnpaid) return false;
+                
+                if (!bill.due_date) return false;
+                // إزالة أي مسافات زائدة
+                const dueDateClean = bill.due_date.trim();
+                return dueDateClean < todayStr;
+            });
+
+            const count = overdueBills.length;
+
+            if (count > 0) {
+                badge.innerText = count;
+                badge.classList.remove('hidden');
+                countPill.innerText = `${count} متأخرة`;
+                countPill.className = "bg-rose-100 text-rose-700 text-xs px-2 py-0.5 rounded-full font-semibold animate-pulse";
+
+                itemsContainer.innerHTML = '';
+                overdueBills.forEach(bill => {
+                    const item = document.createElement('div');
+                    item.className = 'p-3 hover:bg-slate-50 transition cursor-pointer flex flex-col gap-1';
+                    item.onclick = () => {
+                        // عند الضغط على التنبيه يتم فلترة الجدول والبحث عن هذه الفاتورة المحددة
+                        document.getElementById('search-input').value = bill.bill_id;
+                        applyFiltersAndSearch();
+                        toggleNotifications();
+                    };
+
+                    item.innerHTML = `
+                        <div class="flex justify-between items-center">
+                            <span class="font-bold text-slate-900">${bill.bill_id} - ${bill.bill_type}</span>
+                            <span class="text-rose-600 font-bold font-mono">${(parseFloat(bill.total) || 0).toFixed(2)} ر.س</span>
+                        </div>
+                        <div class="flex justify-between text-slate-500 text-[11px] mt-1">
+                            <span>المستأجر: ${bill.tenant_name} (${bill.apartment_number})</span>
+                            <span class="text-rose-500 font-medium">تاريخ الاستحقاق: ${bill.due_date}</span>
+                        </div>
+                    `;
+                    itemsContainer.appendChild(item);
+                });
+            } else {
+                badge.classList.add('hidden');
+                countPill.innerText = `لا توجد متأخرات`;
+                countPill.className = "bg-emerald-100 text-emerald-700 text-xs px-2 py-0.5 rounded-full font-semibold";
+                itemsContainer.innerHTML = `
+                    <div class="p-6 text-center text-slate-400 flex flex-col items-center gap-2">
+                        <i class="fa-solid fa-circle-check text-2xl text-emerald-500"></i>
+                        <span>رائع! لا توجد فواتير متأخرة تجاوزت تاريخ الاستحقاق.</span>
+                    </div>
+                `;
+            }
+        }
+
+        function toggleNotifications() {
+            const dropdown = document.getElementById('notification-dropdown');
+            if (dropdown) {
+                dropdown.classList.toggle('hidden');
+            }
+        }
+
+        // إغلاق القائمة المنسدلة عند النقر في أي مكان خارجها
+        window.addEventListener('click', function(e) {
+            const dropdown = document.getElementById('notification-dropdown');
+            const bellBtn = document.querySelector('[onclick="toggleNotifications()"]');
+            if (dropdown && !dropdown.classList.contains('hidden')) {
+                if (bellBtn && !bellBtn.contains(e.target) && !dropdown.contains(e.target)) {
+                    dropdown.classList.add('hidden');
+                }
+            }
+        });
+
+        // تشغيل البداية
+        renderStats();
+        renderTable();
+        updateOverdueNotifications();
+    </script>
+</body>
+</html>
